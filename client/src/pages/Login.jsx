@@ -1,0 +1,57 @@
+import { useState } from 'react';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { getToken, login } from '../api/auth.js';
+import AuthForm from '../components/AuthForm.jsx';
+import { Button, ErrorText, Input, Label, Muted, Stack } from '../components/ui.js';
+
+export default function Login() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState({ email: '', password: '' });
+
+  const mutation = useMutation({
+    mutationFn: login,
+    onSuccess: ({ user }) => {
+      queryClient.clear();
+      queryClient.setQueryData(['me'], user);
+      navigate(location.state?.from ?? '/groups', { replace: true });
+    },
+  });
+
+  if (getToken()) return <Navigate to="/groups" replace />;
+
+  const change = (e) => setForm({ ...form, [e.target.name]: e.target.value });
+
+  return (
+    <AuthForm
+      subtitle="모임 정산과 입금 현황을 한 곳에서"
+      onSubmit={(e) => {
+        e.preventDefault();
+        mutation.mutate(form);
+      }}
+    >
+      <Stack $gap={14}>
+        <Label>
+          이메일
+          <Input name="email" type="email" autoComplete="email" value={form.email} onChange={change} placeholder="you@example.com" />
+        </Label>
+        <Label>
+          비밀번호
+          <Input name="password" type="password" autoComplete="current-password" value={form.password} onChange={change} />
+        </Label>
+        {mutation.error && <ErrorText>{mutation.error.message}</ErrorText>}
+        <Button type="submit" $block disabled={mutation.isPending}>
+          {mutation.isPending ? '로그인 중...' : '로그인'}
+        </Button>
+        <Muted style={{ textAlign: 'center' }}>
+          계정이 없나요? <Link to="/signup" style={{ color: 'var(--primary)', fontWeight: 600 }}>회원가입</Link>
+        </Muted>
+        <Muted $size={12} style={{ textAlign: 'center' }}>
+          (Mock) 데모 계정: demo@example.com / 비밀번호는 아무 값
+        </Muted>
+      </Stack>
+    </AuthForm>
+  );
+}
