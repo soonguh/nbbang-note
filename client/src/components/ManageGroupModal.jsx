@@ -6,7 +6,9 @@ import styled from 'styled-components';
 import { addMember, deleteGroup, removeMember, updateGroup } from '../api/groups.js';
 import { invalidateGroup } from '../hooks/invalidate.js';
 import Modal from './Modal.jsx';
-import { Badge, Button, ErrorText, Input, Label, Muted, Row, Stack } from './ui.js';
+import MemberNameInput from './MemberNameInput.jsx';
+import { MemberChip } from './MemberChips.jsx';
+import { Button, Chips, ErrorText, Input, Label, Muted, Row, Stack } from './ui.js';
 
 const Section = styled.div`
   padding-top: 16px;
@@ -18,28 +20,11 @@ const Section = styled.div`
   }
 `;
 
-const MemberList = styled.ul`
-  list-style: none;
-  margin: 0 0 12px;
-  padding: 0;
-  li {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 0;
-    border-bottom: 1px solid var(--border);
-  }
-  li span.name {
-    flex: 1;
-  }
-`;
-
 export default function ManageGroupModal({ group, onClose }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [name, setName] = useState(group.name);
   const [meetingDate, setMeetingDate] = useState(group.meeting_date ?? '');
-  const [newMember, setNewMember] = useState('');
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
 
@@ -55,15 +40,17 @@ export default function ManageGroupModal({ group, onClose }) {
     },
     onError,
   });
-  const addMut = useMutation({
-    mutationFn: () => addMember(group.id, newMember),
-    onSuccess: () => {
-      setError('');
-      setNewMember('');
+  // 여러 이름을 순서대로 한 명씩 추가 (API는 한 번에 한 명)
+  // 중간에 실패하면 거기서 멈추고 오류를 MemberNameInput 에 전달한다
+  const addMembers = async (names) => {
+    try {
+      for (const n of names) {
+        await addMember(group.id, n);
+      }
+    } finally {
       refresh();
-    },
-    onError,
-  });
+    }
+  };
   const removeMut = useMutation({
     mutationFn: (memberId) => removeMember(group.id, memberId),
     onSuccess: () => {
@@ -124,41 +111,33 @@ export default function ManageGroupModal({ group, onClose }) {
 
       <Section>
         <h3>멤버 ({group.members.length}명)</h3>
-        <MemberList>
-          {group.members.map((m) => {
-            const isOwner = m.user_id === group.owner_id;
-            return (
-              <li key={m.id}>
-                <span className="name">{m.display_name}</span>
-                {isOwner && <Badge>총무</Badge>}
-                {!isOwner && !m.user_id && <Badge $tone="danger">비회원</Badge>}
-                {!isOwner && (
-                  <Button
-                    $small
-                    $variant="ghost"
-                    disabled={removeMut.isPending}
-                    onClick={() => window.confirm(`${m.display_name} 님을 모임에서 제외할까요?`) && removeMut.mutate(m.id)}
-                  >
-                    제외
-                  </Button>
-                )}
-              </li>
-            );
-          })}
-        </MemberList>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            addMut.mutate();
-          }}
-        >
-          <Row>
-            <Input value={newMember} onChange={(e) => setNewMember(e.target.value)} placeholder="추가할 멤버 이름" aria-label="추가할 멤버 이름" />
-            <Button type="submit" $variant="secondary" disabled={addMut.isPending || !newMember.trim()}>
-              추가
-            </Button>
-          </Row>
-        </form>
+        <Stack $gap={12}>
+          <Chips>
+            {group.members.map((m) => {
+              const isOwner = m.user_id === group.owner_id;
+              return (
+                <MemberChip
+                  key={m.id}
+                  name={m.display_name}
+                  tag={isOwner ? '총무' : m.user_id ? null : '비회원'}
+                  muted={!isOwner && !m.user_id}
+                  disabled={removeMut.isPending}
+                  // 총무는 제외할 수 없으니 X 버튼 없음
+                  onRemove={
+                    isOwner
+                      ? undefined
+                      : () => window.confirm(`${m.display_name} 님을 모임에서 제외할까요?`) && removeMut.mutate(m.id)
+                  }
+                />
+              );
+            })}
+          </Chips>
+          <MemberNameInput
+            existingNames={group.members.map((m) => m.display_name)}
+            onAdd={addMembers}
+            placeholder="추가할 이름 (쉼표로 여러 명)"
+          />
+        </Stack>
       </Section>
 
       {error && <ErrorText style={{ marginTop: 12 }}>{error}</ErrorText>}

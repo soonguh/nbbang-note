@@ -6,13 +6,32 @@
 import { ApiError, delay, loadDb, nextId, now, saveDb } from '../mock/db.js';
 
 const TOKEN_KEY = 'token';
+const AUTH_EVENT = 'auth-change';
 
 export function getToken() {
   return localStorage.getItem(TOKEN_KEY);
 }
 
+// 토큰 저장/삭제 시 이벤트를 보내 화면(useAuthToken)이 즉시 다시 그려지게 한다
+export function setToken(token) {
+  localStorage.setItem(TOKEN_KEY, token);
+  window.dispatchEvent(new Event(AUTH_EVENT));
+}
+
 export function logout() {
   localStorage.removeItem(TOKEN_KEY);
+  window.dispatchEvent(new Event(AUTH_EVENT));
+}
+
+// 토큰 변경 구독 (다른 탭에서 로그인/로그아웃한 경우도 storage 이벤트로 반영)
+export function subscribeToken(callback) {
+  const onStorage = (e) => e.key === TOKEN_KEY && callback();
+  window.addEventListener(AUTH_EVENT, callback);
+  window.addEventListener('storage', onStorage);
+  return () => {
+    window.removeEventListener(AUTH_EVENT, callback);
+    window.removeEventListener('storage', onStorage);
+  };
 }
 
 // 응답에서 password_hash는 절대 내보내지 않는다 (서버와 동일)
@@ -64,7 +83,7 @@ export async function signup({ email, password, name }) {
   db.users.push(user);
   saveDb(db);
   const token = `mock-token-${user.id}`;
-  localStorage.setItem(TOKEN_KEY, token);
+  setToken(token);
   return { token, user: toPublicUser(user) };
 }
 
@@ -79,7 +98,7 @@ export async function login({ email, password }) {
     throw new ApiError('이메일 또는 비밀번호가 올바르지 않습니다.', 401);
   }
   const token = `mock-token-${user.id}`;
-  localStorage.setItem(TOKEN_KEY, token);
+  setToken(token);
   return { token, user: toPublicUser(user) };
 }
 

@@ -1,9 +1,10 @@
 // 로그인/회원가입 공통 폼 레이아웃
 import styled from 'styled-components';
-import { Card } from './ui.js';
+import { IoInformationCircleOutline } from 'react-icons/io5';
+import { Card, HEADER_HEIGHT } from './ui.js';
 
 const Wrap = styled.div`
-  min-height: 100vh;
+  min-height: calc(100vh - ${HEADER_HEIGHT}px);
   display: grid;
   place-items: center;
   padding: 24px 16px;
@@ -29,7 +30,20 @@ const Sub = styled.p`
   font-size: 14px;
 `;
 
-export default function AuthForm({ subtitle, onSubmit, children }) {
+const Notice = styled.p`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 20px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 14px;
+  font-weight: 600;
+`;
+
+export default function AuthForm({ subtitle, notice, onSubmit, children }) {
   return (
     <Wrap>
       <Box as="form" onSubmit={onSubmit} noValidate>
@@ -37,6 +51,11 @@ export default function AuthForm({ subtitle, onSubmit, children }) {
           <span>총무</span>의 일지
         </Title>
         <Sub>{subtitle}</Sub>
+        {notice && (
+          <Notice role="status">
+            <IoInformationCircleOutline size={18} /> {notice}
+          </Notice>
+        )}
         {children}
       </Box>
     </Wrap>

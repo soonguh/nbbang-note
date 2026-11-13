@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { getToken, signup } from '../api/auth.js';
 import AuthForm from '../components/AuthForm.jsx';
@@ -8,18 +8,21 @@ import { Button, ErrorText, Input, Label, Muted, Stack } from '../components/ui.
 export default function Signup() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const location = useLocation();
   const [form, setForm] = useState({ email: '', password: '', name: '' });
+  // 로그인 화면에서 넘어온 경우 원래 가려던 주소를 이어받는다
+  const from = location.state?.from ?? '/groups';
 
   const mutation = useMutation({
     mutationFn: signup,
     onSuccess: ({ user }) => {
       queryClient.clear();
       queryClient.setQueryData(['me'], user);
-      navigate('/groups', { replace: true });
+      navigate(from, { replace: true });
     },
   });
 
-  if (getToken()) return <Navigate to="/groups" replace />;
+  if (getToken()) return <Navigate to={from} replace />;
 
   const change = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
@@ -49,7 +52,7 @@ export default function Signup() {
           {mutation.isPending ? '가입 중...' : '가입하기'}
         </Button>
         <Muted style={{ textAlign: 'center' }}>
-          이미 계정이 있나요? <Link to="/login" style={{ color: 'var(--primary)', fontWeight: 600 }}>로그인</Link>
+          이미 계정이 있나요? <Link to="/login" state={{ from }} style={{ color: 'var(--primary)', fontWeight: 600 }}>로그인</Link>
         </Muted>
       </Stack>
     </AuthForm>

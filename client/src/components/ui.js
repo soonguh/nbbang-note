@@ -153,3 +153,13 @@ export const Empty = styled.div`
 export function won(amount) {
   return `${Number(amount || 0).toLocaleString('ko-KR')}원`;
 }
+
+// 상단 내비게이션 바 높이 (px)
+export const HEADER_HEIGHT = 57;
+
+// 칩(멤버 이름 등) 묶음
+export const Chips = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+`;

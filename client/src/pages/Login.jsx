@@ -10,23 +10,27 @@ export default function Login() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const [form, setForm] = useState({ email: '', password: '' });
+  // 로그인 가드가 넘겨준 값: 원래 가려던 주소, 안내 문구
+  const from = location.state?.from ?? '/groups';
+  const notice = location.state?.notice;
 
   const mutation = useMutation({
     mutationFn: login,
     onSuccess: ({ user }) => {
       queryClient.clear();
       queryClient.setQueryData(['me'], user);
-      navigate(location.state?.from ?? '/groups', { replace: true });
+      navigate(from, { replace: true });
     },
   });
 
-  if (getToken()) return <Navigate to="/groups" replace />;
+  if (getToken()) return <Navigate to={from} replace />;
 
   const change = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
   return (
     <AuthForm
       subtitle="모임 정산과 입금 현황을 한 곳에서"
+      notice={notice}
       onSubmit={(e) => {
         e.preventDefault();
         mutation.mutate(form);
@@ -46,7 +50,7 @@ export default function Login() {
           {mutation.isPending ? '로그인 중...' : '로그인'}
         </Button>
         <Muted style={{ textAlign: 'center' }}>
-          계정이 없나요? <Link to="/signup" style={{ color: 'var(--primary)', fontWeight: 600 }}>회원가입</Link>
+          계정이 없나요? <Link to="/signup" state={{ from }} style={{ color: 'var(--primary)', fontWeight: 600 }}>회원가입</Link>
         </Muted>
         <Muted $size={12} style={{ textAlign: 'center' }}>
           (Mock) 데모 계정: demo@example.com / 비밀번호는 아무 값

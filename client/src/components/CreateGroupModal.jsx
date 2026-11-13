@@ -2,38 +2,12 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import styled from 'styled-components';
-import { IoClose } from 'react-icons/io5';
 import { createGroup } from '../api/groups.js';
 import { useMe } from '../hooks/useMe.js';
 import Modal from './Modal.jsx';
-import { Button, ErrorText, Input, Label, Muted, Row, Stack } from './ui.js';
-
-const Chips = styled.div`
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-`;
-
-const Chip = styled.span`
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px 4px 12px;
-  border-radius: 999px;
-  background: var(--primary-soft);
-  color: var(--primary);
-  font-size: 13px;
-  font-weight: 600;
-  button {
-    border: 0;
-    background: transparent;
-    color: inherit;
-    cursor: pointer;
-    line-height: 0;
-    padding: 2px;
-  }
-`;
+import MemberNameInput from './MemberNameInput.jsx';
+import { MemberChip } from './MemberChips.jsx';
+import { Button, Chips, ErrorText, Input, Label, Muted, Row, Stack } from './ui.js';
 
 function today() {
   const d = new Date();
@@ -46,9 +20,7 @@ export default function CreateGroupModal({ onClose }) {
   const { data: me } = useMe();
   const [name, setName] = useState('');
   const [meetingDate, setMeetingDate] = useState(today());
-  const [memberInput, setMemberInput] = useState('');
   const [memberNames, setMemberNames] = useState([]);
-  const [localError, setLocalError] = useState('');
 
   const mutation = useMutation({
     mutationFn: createGroup,
@@ -58,18 +30,6 @@ export default function CreateGroupModal({ onClose }) {
       navigate(`/groups/${group.id}`);
     },
   });
-
-  const addName = () => {
-    const value = memberInput.trim();
-    if (!value) return;
-    if (value === me?.name || memberNames.includes(value)) {
-      setLocalError('이미 추가된 이름입니다.');
-      return;
-    }
-    setMemberNames([...memberNames, value]);
-    setMemberInput('');
-    setLocalError('');
-  };
 
   const submit = (e) => {
     e.preventDefault();
@@ -90,44 +50,29 @@ export default function CreateGroupModal({ onClose }) {
           </Label>
           <Label as="div">
             멤버
-            <Row>
-              <Input
-                value={memberInput}
-                onChange={(e) => setMemberInput(e.target.value)}
-                onKeyDown={(e) => {
-                  // 한글 조합 중 Enter는 무시
-                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
-                    e.preventDefault();
-                    addName();
-                  }
-                }}
-                placeholder="이름 입력 후 Enter"
-                aria-label="멤버 이름"
-              />
-              <Button $variant="secondary" onClick={addName}>
-                추가
-              </Button>
-            </Row>
-            <Muted $size={13}>회원이 아니어도 이름만으로 추가할 수 있어요. 총무({me?.name})는 자동으로 포함됩니다.</Muted>
+            <MemberNameInput
+              // 총무 본인 이름도 중복 검사에 포함
+              existingNames={[me?.name ?? '', ...memberNames]}
+              onAdd={(names) => setMemberNames((prev) => [...prev, ...names])}
+              placeholder="예) 김철수, 이영희, 박민수"
+            />
+            <Muted $size={13}>
+              쉼표로 여러 명을 한 번에 넣을 수 있어요. 회원이 아니어도 이름만으로 추가돼요. 총무({me?.name})는 자동으로 포함됩니다.
+            </Muted>
           </Label>
-          <Chips>
-            <Chip>{me?.name} (총무)</Chip>
+          <Chips aria-label={`멤버 ${memberNames.length + 1}명`}>
+            <MemberChip name={me?.name} tag="총무" />
             {memberNames.map((n) => (
-              <Chip key={n}>
-                {n}
-                <button type="button" aria-label={`${n} 빼기`} onClick={() => setMemberNames(memberNames.filter((x) => x !== n))}>
-                  <IoClose />
-                </button>
-              </Chip>
+              <MemberChip key={n} name={n} onRemove={() => setMemberNames((prev) => prev.filter((x) => x !== n))} />
             ))}
           </Chips>
-          {(localError || mutation.error) && <ErrorText>{localError || mutation.error.message}</ErrorText>}
+          {mutation.error && <ErrorText>{mutation.error.message}</ErrorText>}
           <Row $justify="flex-end">
             <Button $variant="secondary" onClick={onClose}>
               취소
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? '만드는 중...' : '만들기'}
+              {mutation.isPending ? '만드는 중...' : `만들기 (${memberNames.length + 1}명)`}
             </Button>
           </Row>
         </Stack>
