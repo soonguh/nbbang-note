@@ -130,7 +130,7 @@ export default function ExpenseFormModal({ group, expense, onClose }) {
           </Label>
           {preview.length > 0 && (
             <Muted $size={13}>
-              1인당 {shares.map(won).join(' / ')} (나머지 처리 규칙: utils/settle.js의 splitEvenly)
+              1인당 {shares.map(won).join(' / ')}
             </Muted>
           )}
           {mutation.error && <ErrorText>{mutation.error.message}</ErrorText>}
