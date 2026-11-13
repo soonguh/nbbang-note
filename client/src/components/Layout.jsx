@@ -71,7 +71,7 @@ export default function Layout() {
       <Header>
         <Inner aria-label="주요 메뉴">
           <Logo to="/" end>
-            <span>총무</span>의 일지
+            <span>N빵</span>노트
           </Logo>
           {loggedIn ? (
             <>

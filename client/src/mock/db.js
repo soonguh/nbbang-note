@@ -2,7 +2,7 @@
 // 테이블 이름과 필드 이름은 MySQL 스키마(snake_case)와 동일하게 유지한다.
 import { buildSeed } from './seed.js';
 
-const DB_KEY = 'chongmu_mock_db';
+const DB_KEY = 'nbbang_note_mock_db';
 
 // 서버 오류처럼 다루기 위한 에러 클래스 (status는 HTTP 상태 코드와 같은 의미)
 export class ApiError extends Error {

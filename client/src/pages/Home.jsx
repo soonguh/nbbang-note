@@ -166,7 +166,7 @@ export default function Home() {
           <Headline>
             총무의 정산 고민,
             <br />
-            <span>총무의 일지</span>가 덜어 드려요
+            <span>N빵노트</span>가 덜어 드려요
           </Headline>
           <Lead>
             지출만 기록하면 1원 단위까지 나눠서 누가 누구에게 보낼지 알려 주고, 송금 안내문까지 한 번에 복사할 수 있어요.

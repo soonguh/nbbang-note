@@ -48,7 +48,7 @@ export default function AuthForm({ subtitle, notice, onSubmit, children }) {
     <Wrap>
       <Box as="form" onSubmit={onSubmit} noValidate>
         <Title>
-          <span>총무</span>의 일지
+          <span>N빵</span>노트
         </Title>
         <Sub>{subtitle}</Sub>
         {notice && (

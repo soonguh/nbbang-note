@@ -1,5 +1,5 @@
 <!-- 사용법: 1단계(client)가 끝나고 USER-1~3을 직접 채워 검증한 뒤, 새 세션(또는 /clear)에서 이 파일 내용 전체를 붙여 넣기.
-     실행 전 확인: MySQL이 켜져 있고 chongmu_diary DB가 있으며, schema.sql이 /server/db/schema.sql 에 복사되어 있어야 함. -->
+     실행 전 확인: MySQL이 켜져 있고 nbbang_note_20413 DB가 있으며, schema.sql이 /server/db/schema.sql 에 복사되어 있어야 함. -->
 
 # [2단계] server 개발 + MySQL 연동 + client 연결
 
@@ -7,7 +7,7 @@ CLAUDE.md 규칙에 따라 /server 폴더에 Express + MySQL 백엔드를 만들
 /client의 UI 컴포넌트·페이지와, 내가 작성한 /client/src/utils/settle.js, message.js는 수정하지 마. 바꿀 수 있는 client 파일은 /client/src/api/ 와 Vite proxy 설정(vite.config.js), axios 설치뿐이야.
 
 ## DB 상태 (중요)
-- DB `chongmu_diary`와 6개 테이블은 이미 만들어져 있어. 테이블을 다시 만들거나 구조를 바꾸지 마.
+- DB `nbbang_note_20413`와 6개 테이블은 이미 만들어져 있어. 테이블을 다시 만들거나 구조를 바꾸지 마.
 - /server/db/schema.sql 을 읽어서 컬럼·제약을 그대로 따라줘. `groups`는 예약어라 SQL에서 항상 백틱으로 감쌀 것.
 - 제약 참고: users.email은 UNIQUE, `groups`.owner_id는 users를 참조(삭제 시 CASCADE 없음), group_members.user_id는 회원 삭제 시 NULL로 바뀜, 나머지 자식 테이블은 ON DELETE CASCADE.
 - 지금 테이블은 비어 있어. 시드는 /server/db/seed.sql 로 따로 만들어줘 (비밀번호 해시는 bcrypt로 만든 실제 해시 문자열 사용, 평문 비밀번호는 README에 "테스트용"이라고 명시).
@@ -25,7 +25,7 @@ server/
 └─ package.json
 
 ## 작업 순서 (각 항목 완료 시 동작 확인 결과를 보고하고, 다음 항목으로 넘어가기 전에 멈추지 말고 이어서 진행)
-1. /server 초기화 (express, mysql2, bcrypt, jsonwebtoken, cors, dotenv)와 .env.example (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME=chongmu_diary, JWT_SECRET, PORT). 실제 .env는 만들지 마
+1. /server 초기화 (express, mysql2, bcrypt, jsonwebtoken, cors, dotenv)와 .env.example (DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME=nbbang_note_20413, JWT_SECRET, PORT). 실제 .env는 만들지 마
 2. mysql2 커넥션 풀(db.js), 공통 에러 핸들러, GET /health (DB 연결 확인)
 3. 인증: POST /auth/signup(bcrypt), POST /auth/login(JWT), 인증 미들웨어, GET /me, PATCH /me/account
 4. 모임: GET/POST /groups, GET/PATCH/DELETE /groups/:id, POST /groups/:id/members, DELETE /groups/:id/members/:memberId

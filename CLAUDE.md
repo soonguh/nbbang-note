@@ -1,9 +1,9 @@
-# 프로젝트: 총무의 일지 (chongmu-diary) — 모임 정산 & 입금 현황 관리 웹앱
+# 프로젝트: N빵노트 (nbbang-note) — 모임 정산 & 입금 현황 관리 웹앱
 
 ## 스택과 구조
 - 프론트(/client): React(Vite) + React Router + TanStack Query + Recharts
 - 백엔드(/server): Node.js(Express) + mysql2 + JWT + bcrypt
-- DB: MySQL 8, DB명 `chongmu_diary` (이미 생성되어 있고 schema.sql이 적용된 상태)
+- DB: MySQL 8, DB명 `nbbang_note_20413` (이미 생성되어 있고 schema.sql이 적용된 상태. 이 이름 그대로 쓰고 바꾸지 마)
 - 구조: /client (프론트), /server (백엔드), /server/db (schema.sql, seed.sql)
 - 금액은 모두 원 단위 정수(소수점 금지), DB는 BIGINT
 - 한국어 UI, 코드 주석은 한국어
