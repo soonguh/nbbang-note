@@ -56,4 +56,4 @@ server/
 - schema.sql은 이미 적용된 상태에서 seed.sql 실행 → `cd server && npm run dev` → `cd client && npm run dev` → 브라우저에서 가입·로그인·모임·지출·정산·통계 전체 플로우 동작
 - 보안 점검: 모든 SQL은 파라미터 바인딩, 비밀번호는 bcrypt 해시, 계좌번호는 같은 모임 멤버에게만 노출, JWT_SECRET은 환경변수
 - CLAUDE.md 형식의 TODO 표(파일 경로, 줄 번호)를 grep 결과로 보고
-- 로컬 실행 방법(MySQL 접속 정보 설정, seed 실행, 서버·클라이언트 기동 명령)을 /README.md에 정리
+- 로컬 실행 방법(MySQL 접속 정보 설정, seed 실행, 서버·클라이언트 기동 명령)을 /README.md에 정
