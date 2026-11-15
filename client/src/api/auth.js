@@ -3,7 +3,8 @@
 //   login         → POST  /api/auth/login    응답: { token, user }
 //   getMe         → GET   /api/me            응답: user
 //   updateAccount → PATCH /api/me/account    응답: user
-import { get, patch, post } from './http.js';
+//   deleteAccount → DELETE /api/me           응답: { id }   body: { password }
+import { del, get, patch, post } from './http.js';
 
 const TOKEN_KEY = 'token';
 const AUTH_EVENT = 'auth-change';
@@ -52,4 +53,11 @@ export function getMe() {
 
 export function updateAccount({ bank_name, account_number }) {
   return patch('/me/account', { bank_name, account_number });
+}
+
+// 회원 탈퇴: 성공하면 토큰도 지운다
+export async function deleteAccount(password) {
+  const data = await del('/me', { password });
+  logout();
+  return data;
 }

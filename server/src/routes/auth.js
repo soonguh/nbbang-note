@@ -3,9 +3,10 @@
 //   POST  /api/auth/login    body: { email, password }           → { token, user }
 //   GET   /api/me                                                → user
 //   PATCH /api/me/account    body: { bank_name, account_number } → user
+//   DELETE /api/me           body: { password }                  → { id }  (회원 탈퇴)
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
-import { pool } from '../db.js';
+import { pool, withTransaction } from '../db.js';
 import { requireAuth, signToken } from '../middleware/auth.js';
 import { asyncHandler, HttpError } from '../middleware/errorHandler.js';
 
@@ -95,6 +96,34 @@ router.patch(
     const user = await findPublicUser(req.user.id);
     if (!user) throw new HttpError(401, '로그인이 필요합니다.');
     res.json(user);
+  }),
+);
+
+// 회원 탈퇴
+// - 비밀번호를 다시 확인한다 (토큰만 탈취돼도 계정이 지워지지 않도록)
+// - 내가 총무인 모임이 있으면 거부: `groups`.owner_id 는 CASCADE 가 없고,
+//   모임을 자동으로 지우면 다른 멤버의 지출·정산 기록까지 사라지므로 먼저 직접 정리하게 한다
+// - 다른 사람 모임의 멤버 기록은 schema 의 ON DELETE SET NULL 로 비회원 멤버(이름만)로 남는다
+router.delete(
+  '/me',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
+    if (!password) throw new HttpError(400, '비밀번호를 입력해 주세요.');
+
+    const [[user]] = await pool.execute('SELECT id, password_hash FROM users WHERE id = ?', [req.user.id]);
+    if (!user) throw new HttpError(401, '로그인이 필요합니다.');
+    if (!(await bcrypt.compare(password, user.password_hash))) throw new HttpError(400, '비밀번호가 올바르지 않습니다.');
+
+    await withTransaction(async (conn) => {
+      const [owned] = await conn.execute('SELECT name FROM `groups` WHERE owner_id = ? ORDER BY id FOR UPDATE', [user.id]);
+      if (owned.length > 0) {
+        const names = owned.map((g) => `'${g.name}'`).join(', ');
+        throw new HttpError(409, `내가 총무인 모임 ${owned.length}개(${names})를 먼저 삭제해야 탈퇴할 수 있어요.`);
+      }
+      await conn.execute('DELETE FROM users WHERE id = ?', [user.id]);
+    });
+    res.json({ id: user.id });
   }),
 );
 

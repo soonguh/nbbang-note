@@ -78,10 +78,11 @@ npm test                  # vitest: 정산·분배·안내문
 | GET | /health | DB 연결 확인 | - |
 | POST | /auth/signup, /auth/login | 가입 / 로그인 → `{ token, user }` | - |
 | GET / PATCH | /me, /me/account | 내 정보 / 계좌 저장 | 로그인 |
+| DELETE | /me | 회원 탈퇴 `{ password }` (총무인 모임이 있으면 409, 참여 기록은 비회원 멤버로 남음) | 로그인 |
 | GET / POST | /groups | 목록 `{ owned, joined }` / 생성 | 로그인 |
 | GET | /groups/:id | 모임 상세 | 총무·회원 멤버 |
 | PATCH / DELETE | /groups/:id | 수정 / 삭제 | canEditGroup |
-| POST / DELETE | /groups/:id/members[/:memberId] | 멤버 추가 / 제외 | canEditGroup |
+| POST / PATCH / DELETE | /groups/:id/members[/:memberId] | 멤버 추가 / 이름 수정 / 제외 | canEditGroup |
 | GET / POST | /groups/:id/expenses | 지출 목록 / 등록 (+정산 재계산) | 조회: 멤버, 등록: canEditGroup |
 | PATCH / DELETE | /expenses/:id | 지출 수정 / 삭제 (+정산 재계산) | canEditGroup |
 | GET | /groups/:id/settlement | 멤버별 요약 + 송금 목록(받는 사람 계좌 포함) | 총무·회원 멤버 |

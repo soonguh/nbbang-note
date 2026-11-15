@@ -37,4 +37,5 @@ http.interceptors.response.use(
 export const get = (url) => http.get(url).then((r) => r.data);
 export const post = (url, body) => http.post(url, body).then((r) => r.data);
 export const patch = (url, body) => http.patch(url, body).then((r) => r.data);
-export const del = (url) => http.delete(url).then((r) => r.data);
+// DELETE 에 본문이 필요하면 두 번째 인자로 (예: 회원 탈퇴 비밀번호 확인)
+export const del = (url, body) => http.delete(url, body === undefined ? undefined : { data: body }).then((r) => r.data);

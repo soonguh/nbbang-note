@@ -5,6 +5,7 @@
 //   PATCH  /api/groups/:id                    body: { name, meeting_date }   → group
 //   DELETE /api/groups/:id                    → { id }
 //   POST   /api/groups/:id/members            body: { display_name }         → member
+//   PATCH  /api/groups/:id/members/:memberId  body: { display_name }         → member
 //   DELETE /api/groups/:id/members/:memberId  → { id }
 // group = { ...`groups` 행, owner_name, members: [group_members 행], total_amount }
 // ※ members 에는 계좌 정보를 넣지 않는다 (계좌는 정산 화면에서 같은 모임 멤버에게만)
@@ -177,6 +178,30 @@ router.post(
       display_name,
     ]);
     res.status(201).json({ id: result.insertId, group_id: group.id, user_id: null, display_name });
+  }),
+);
+
+// 멤버 이름 수정 (총무만). 지출·정산은 member id 로 연결되어 있어 바뀐 이름이 바로 반영된다.
+router.patch(
+  '/groups/:id/members/:memberId',
+  asyncHandler(async (req, res) => {
+    const group = await loadEditableGroup(pool, req.params.id, req.user);
+    const display_name = validName(req.body.display_name, '멤버 이름');
+    const memberId = Number(req.params.memberId) || 0;
+    const member = await withTransaction(async (conn) => {
+      await lockGroup(conn, group.id); // 동시에 같은 이름으로 바꾸는 경우 방지
+      const [[found]] = await conn.execute('SELECT * FROM group_members WHERE id = ? AND group_id = ?', [memberId, group.id]);
+      if (!found) throw new HttpError(404, '멤버를 찾을 수 없습니다.');
+      const [dup] = await conn.execute('SELECT id FROM group_members WHERE group_id = ? AND display_name = ? AND id <> ?', [
+        group.id,
+        display_name,
+        found.id,
+      ]);
+      if (dup.length > 0) throw new HttpError(409, '같은 이름의 멤버가 이미 있습니다.');
+      await conn.execute('UPDATE group_members SET display_name = ? WHERE id = ?', [display_name, found.id]);
+      return { ...found, display_name };
+    });
+    res.json(member);
   }),
 );
 

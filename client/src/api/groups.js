@@ -5,6 +5,7 @@
 //   PATCH  /api/groups/:id                    → group    body: { name, meeting_date }
 //   DELETE /api/groups/:id                    → { id }
 //   POST   /api/groups/:id/members            → member   body: { display_name }
+//   PATCH  /api/groups/:id/members/:memberId  → member   body: { display_name }
 //   DELETE /api/groups/:id/members/:memberId  → { id }
 // group = { ...groups 행, owner_name, members: [group_members 행], total_amount }
 import { del, get, patch, post } from './http.js';
@@ -33,6 +34,10 @@ export function deleteGroup(groupId) {
 
 export function addMember(groupId, name) {
   return post(`/groups/${groupId}/members`, { display_name: name });
+}
+
+export function renameMember(groupId, memberId, name) {
+  return patch(`/groups/${groupId}/members/${memberId}`, { display_name: name });
 }
 
 export function removeMember(groupId, memberId) {

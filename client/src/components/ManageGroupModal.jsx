@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { addMember, deleteGroup, removeMember, updateGroup } from '../api/groups.js';
+import { addMember, deleteGroup, removeMember, renameMember, updateGroup } from '../api/groups.js';
 import { invalidateGroup } from '../hooks/invalidate.js';
 import Modal from './Modal.jsx';
 import MemberNameInput from './MemberNameInput.jsx';
@@ -17,6 +17,18 @@ const Section = styled.div`
   h3 {
     font-size: 15px;
     margin-bottom: 10px;
+  }
+`;
+
+// 칩 자리에 나타나는 이름 수정 입력창
+const RenameForm = styled.form`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  input {
+    width: 120px;
+    padding: 4px 10px;
+    font-size: 13px;
   }
 `;
 
@@ -51,6 +63,25 @@ export default function ManageGroupModal({ group, onClose }) {
       refresh();
     }
   };
+  // 멤버 이름 수정: renaming = { id, value } (null 이면 수정 중 아님)
+  const [renaming, setRenaming] = useState(null);
+  const renameMut = useMutation({
+    mutationFn: ({ id, value }) => renameMember(group.id, id, value),
+    onSuccess: () => {
+      setError('');
+      setRenaming(null);
+      refresh();
+    },
+    onError,
+  });
+  const submitRename = (e) => {
+    e.preventDefault();
+    const value = renaming.value.trim();
+    const current = group.members.find((m) => m.id === renaming.id)?.display_name;
+    if (!value || value === current) return setRenaming(null); // 비었거나 그대로면 취소
+    renameMut.mutate({ id: renaming.id, value });
+  };
+
   const removeMut = useMutation({
     mutationFn: (memberId) => removeMember(group.id, memberId),
     onSuccess: () => {
@@ -115,13 +146,34 @@ export default function ManageGroupModal({ group, onClose }) {
           <Chips>
             {group.members.map((m) => {
               const isOwner = m.user_id === group.owner_id;
+              if (renaming?.id === m.id) {
+                return (
+                  <RenameForm key={m.id} onSubmit={submitRename}>
+                    <Input
+                      value={renaming.value}
+                      onChange={(e) => setRenaming({ ...renaming, value: e.target.value })}
+                      onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setRenaming(null))}
+                      maxLength={50}
+                      aria-label={`${m.display_name} 새 이름`}
+                      autoFocus
+                    />
+                    <Button type="submit" $small disabled={renameMut.isPending}>
+                      저장
+                    </Button>
+                    <Button $small $variant="ghost" onClick={() => setRenaming(null)}>
+                      취소
+                    </Button>
+                  </RenameForm>
+                );
+              }
               return (
                 <MemberChip
                   key={m.id}
                   name={m.display_name}
                   tag={isOwner ? '총무' : m.user_id ? null : '비회원'}
                   muted={!isOwner && !m.user_id}
-                  disabled={removeMut.isPending}
+                  disabled={removeMut.isPending || renameMut.isPending}
+                  onEdit={() => setRenaming({ id: m.id, value: m.display_name })}
                   // 총무는 제외할 수 없으니 X 버튼 없음
                   onRemove={
                     isOwner
