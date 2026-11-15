@@ -7,7 +7,7 @@
 // 저장 응답에는 warning(이미 입금 완료된 정산이 있었는지)이 추가된다.
 // expenses + expense_splits + settlements 재계산은 하나의 트랜잭션으로 처리한다.
 import { Router } from 'express';
-import { pool, withTransaction } from '../db.js';
+import { lockGroup, pool, withTransaction } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler, HttpError } from '../middleware/errorHandler.js';
 import { loadEditableGroup, loadGroupForUser } from '../middleware/permission.js';
@@ -84,6 +84,13 @@ async function loadEditableExpense(db, expenseId, user) {
   return expense;
 }
 
+// 모임을 잠근 뒤 지출이 아직 있는지 다시 확인 (잠금을 기다리는 동안 다른 요청이 지웠을 수 있음)
+async function lockForExpense(conn, expense) {
+  await lockGroup(conn, expense.group_id);
+  const [[still]] = await conn.execute('SELECT id FROM expenses WHERE id = ?', [expense.id]);
+  if (!still) throw new HttpError(404, '지출을 찾을 수 없습니다.');
+}
+
 router.get(
   '/groups/:id/expenses',
   asyncHandler(async (req, res) => {
@@ -97,6 +104,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const { expenseId, warning } = await withTransaction(async (conn) => {
       const group = await loadEditableGroup(conn, req.params.id, req.user);
+      await lockGroup(conn, group.id); // 같은 모임의 동시 수정은 한 번에 하나씩
       const v = await validate(conn, group.id, req.body);
       const [result] = await conn.execute(
         'INSERT INTO expenses (group_id, payer_member_id, title, category, amount) VALUES (?, ?, ?, ?, ?)',
@@ -116,6 +124,7 @@ router.patch(
   asyncHandler(async (req, res) => {
     const { expenseId, warning } = await withTransaction(async (conn) => {
       const expense = await loadEditableExpense(conn, req.params.id, req.user);
+      await lockForExpense(conn, expense);
       const v = await validate(conn, expense.group_id, req.body);
       await conn.execute('UPDATE expenses SET title = ?, category = ?, amount = ?, payer_member_id = ? WHERE id = ?', [
         v.title,
@@ -138,6 +147,7 @@ router.delete(
   asyncHandler(async (req, res) => {
     const result = await withTransaction(async (conn) => {
       const expense = await loadEditableExpense(conn, req.params.id, req.user);
+      await lockForExpense(conn, expense);
       await conn.execute('DELETE FROM expense_splits WHERE expense_id = ?', [expense.id]);
       await conn.execute('DELETE FROM expenses WHERE id = ?', [expense.id]);
       const recalculated = await recalculateSettlements(conn, expense.group_id);

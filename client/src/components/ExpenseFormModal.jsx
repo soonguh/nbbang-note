@@ -35,7 +35,8 @@ const CheckList = styled.div`
   }
 `;
 
-export default function ExpenseFormModal({ group, expense, onClose }) {
+// onSaved(warning): 저장 후 서버가 보낸 warning(이미 입금 완료된 정산이 다시 계산된 경우의 안내, 없으면 null)
+export default function ExpenseFormModal({ group, expense, onClose, onSaved }) {
   const queryClient = useQueryClient();
   const isEdit = Boolean(expense);
   const [form, setForm] = useState(() => ({
@@ -49,8 +50,9 @@ export default function ExpenseFormModal({ group, expense, onClose }) {
 
   const mutation = useMutation({
     mutationFn: (data) => (isEdit ? updateExpense(expense.id, data) : createExpense(group.id, data)),
-    onSuccess: () => {
+    onSuccess: (saved) => {
       invalidateGroup(queryClient, group.id);
+      onSaved?.(saved?.warning ?? null);
       onClose();
     },
   });

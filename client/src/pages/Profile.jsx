@@ -2,7 +2,6 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { updateAccount } from '../api/auth.js';
-import { resetDb } from '../mock/db.js';
 import { useMe } from '../hooks/useMe.js';
 import { Button, Card, ErrorText, Input, Label, Muted, Page, Row, Select, Stack } from '../components/ui.js';
 
@@ -69,13 +68,6 @@ function AccountForm({ me }) {
 
 export default function Profile() {
   const { data: me } = useMe();
-  const queryClient = useQueryClient();
-
-  const handleReset = () => {
-    if (!window.confirm('Mock 데이터를 시드 상태로 초기화할까요? 직접 추가한 모임·지출·계정이 모두 지워집니다.')) return;
-    resetDb();
-    queryClient.invalidateQueries();
-  };
 
   return (
     <Page>
@@ -90,18 +82,6 @@ export default function Profile() {
         <Card>
           <h2 style={{ fontSize: 16, marginBottom: 14 }}>받을 계좌</h2>
           <AccountForm key={me.id} me={me} />
-        </Card>
-        {/* 1단계(Mock) 전용 도구. 2단계에서 서버로 바꾸면 삭제 */}
-        <Card>
-          <Row $justify="space-between" $wrap>
-            <Stack $gap={2}>
-              <strong>Mock 데이터 초기화</strong>
-              <Muted $size={13}>시드 데이터로 되돌리고, 시드 지출의 분배 금액을 현재 규칙(splitEvenly)으로 다시 계산해요.</Muted>
-            </Stack>
-            <Button $variant="danger" $small onClick={handleReset}>
-              초기화
-            </Button>
-          </Row>
         </Card>
       </Stack>
     </Page>

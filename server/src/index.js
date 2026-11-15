@@ -21,6 +21,11 @@ const app = express();
 app.disable('x-powered-by');
 app.use(cors({ origin: process.env.CORS_ORIGIN || 'http://localhost:5173' }));
 app.use(express.json({ limit: '100kb' }));
+// Express 5 는 본문이 없거나 JSON 이 아니면 req.body 가 undefined → 라우트에서 req.body.x 접근 시 500 이 나지 않도록 빈 객체로 맞춤
+app.use((req, res, next) => {
+  if (req.body === null || typeof req.body !== 'object' || Array.isArray(req.body)) req.body = {};
+  next();
+});
 
 // DB 연결 확인
 const health = asyncHandler(async (req, res) => {

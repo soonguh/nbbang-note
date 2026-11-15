@@ -9,7 +9,7 @@
 // group = { ...`groups` 행, owner_name, members: [group_members 행], total_amount }
 // ※ members 에는 계좌 정보를 넣지 않는다 (계좌는 정산 화면에서 같은 모임 멤버에게만)
 import { Router } from 'express';
-import { pool, withTransaction } from '../db.js';
+import { lockGroup, pool, withTransaction } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler, HttpError } from '../middleware/errorHandler.js';
 import { loadEditableGroup, loadGroupForUser } from '../middleware/permission.js';
@@ -24,7 +24,9 @@ const NAME_MAX = 50;
 
 function validDate(value) {
   if (value === undefined || value === null || value === '') return null;
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number.isNaN(Date.parse(value))) {
+  // 형식 + 실제 존재하는 날짜인지 (2026-02-30 처럼 넘치는 날짜는 Date 가 다음 달로 넘기므로 되돌려 비교)
+  const d = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00Z`) : null;
+  if (!d || Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== value) {
     throw new HttpError(400, '날짜 형식이 올바르지 않습니다. (YYYY-MM-DD)');
   }
   return value;
@@ -151,6 +153,7 @@ router.delete(
     const group = await loadEditableGroup(pool, req.params.id, req.user);
     // 자식 테이블은 CASCADE 지만, expenses → group_members 참조 때문에 순서를 명시적으로 지운다
     await withTransaction(async (conn) => {
+      await lockGroup(conn, group.id);
       await conn.execute('DELETE FROM settlements WHERE group_id = ?', [group.id]);
       await conn.execute('DELETE FROM expenses WHERE group_id = ?', [group.id]); // expense_splits 는 CASCADE
       await conn.execute('DELETE FROM `groups` WHERE id = ?', [group.id]); // group_members 는 CASCADE
@@ -194,6 +197,7 @@ router.delete(
     );
     if (used.used) throw new HttpError(409, '지출 내역에 포함된 멤버는 제외할 수 없습니다. 관련 지출을 먼저 수정해 주세요.');
     await withTransaction(async (conn) => {
+      await lockGroup(conn, group.id);
       await conn.execute('DELETE FROM settlements WHERE from_member_id = ? OR to_member_id = ?', [member.id, member.id]);
       await conn.execute('DELETE FROM group_members WHERE id = ?', [member.id]);
     });

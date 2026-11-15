@@ -22,7 +22,11 @@ const MYSQL_ERRORS = {
   ER_NO_REFERENCED_ROW_2: [400, '참조하는 데이터가 없습니다.'],
   ER_ROW_IS_REFERENCED_2: [409, '다른 데이터에서 사용 중이라 삭제할 수 없습니다.'],
   ER_TRUNCATED_WRONG_VALUE_FOR_FIELD: [400, '입력값 형식이 올바르지 않습니다.'],
+  ER_TRUNCATED_WRONG_VALUE: [400, '입력값 형식이 올바르지 않습니다.'], // 예) 존재하지 않는 날짜
   WARN_DATA_TRUNCATED: [400, '입력값 형식이 올바르지 않습니다.'],
+  ER_CHECK_CONSTRAINT_VIOLATED: [400, '입력값이 허용 범위를 벗어났습니다.'],
+  ER_LOCK_DEADLOCK: [409, '다른 요청과 동시에 처리되어 실패했어요. 잠시 후 다시 시도해 주세요.'],
+  ER_LOCK_WAIT_TIMEOUT: [409, '다른 요청과 동시에 처리되어 실패했어요. 잠시 후 다시 시도해 주세요.'],
 };
 const DB_DOWN = ['ECONNREFUSED', 'ER_ACCESS_DENIED_ERROR', 'ER_BAD_DB_ERROR', 'PROTOCOL_CONNECTION_LOST', 'ETIMEDOUT'];
 

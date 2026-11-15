@@ -6,7 +6,7 @@
 // ※ 계좌번호(to_account)는 이 모임을 볼 수 있는 사람(총무·회원 멤버)에게만 응답한다.
 // ※ 정산 재계산은 지출이 바뀔 때(routes/expenses.js) 수행하고, 조회는 저장된 행을 그대로 돌려준다.
 import { Router } from 'express';
-import { pool } from '../db.js';
+import { lockGroup, pool, withTransaction } from '../db.js';
 import { requireAuth } from '../middleware/auth.js';
 import { asyncHandler, HttpError } from '../middleware/errorHandler.js';
 import { loadEditableGroup, loadGroupForUser } from '../middleware/permission.js';
@@ -67,15 +67,26 @@ router.patch(
   '/settlements/:id/paid',
   asyncHandler(async (req, res) => {
     if (typeof req.body.is_paid !== 'boolean') throw new HttpError(400, 'is_paid 는 true 또는 false 여야 합니다.');
-    const [[row]] = await pool.execute('SELECT id, group_id FROM settlements WHERE id = ?', [Number(req.params.id) || 0]);
+    const id = Number(req.params.id) || 0;
+    const [[row]] = await pool.execute('SELECT id, group_id FROM settlements WHERE id = ?', [id]);
     if (!row) throw new HttpError(404, '정산 항목을 찾을 수 없습니다.');
     await loadEditableGroup(pool, row.group_id, req.user);
-    await pool.execute('UPDATE settlements SET is_paid = ?, paid_at = IF(?, NOW(), NULL) WHERE id = ?', [
-      req.body.is_paid ? 1 : 0,
-      req.body.is_paid ? 1 : 0,
-      row.id,
-    ]);
-    const [[updated]] = await pool.execute(`${SETTLEMENT_SELECT} WHERE s.id = ?`, [row.id]);
+
+    const updated = await withTransaction(async (conn) => {
+      // 정산 재계산(지출 변경)과 겹치지 않도록 모임을 잠근 뒤, 그 사이 행이 사라졌는지 다시 확인
+      await lockGroup(conn, row.group_id);
+      const paid = req.body.is_paid ? 1 : 0;
+      // 이미 입금 완료인 행을 다시 완료로 보내도 처음 입금 시각(paid_at)은 유지
+      const [result] = await conn.execute(
+        'UPDATE settlements SET is_paid = ?, paid_at = IF(? = 1, COALESCE(paid_at, NOW()), NULL) WHERE id = ?',
+        [paid, paid, row.id],
+      );
+      if (result.affectedRows === 0) {
+        throw new HttpError(409, '정산이 방금 다시 계산되었습니다. 새로고침한 뒤 다시 시도해 주세요.');
+      }
+      const [[fresh]] = await conn.execute(`${SETTLEMENT_SELECT} WHERE s.id = ?`, [row.id]);
+      return fresh;
+    });
     res.json(toSettlement(updated));
   }),
 );

@@ -1,6 +1,8 @@
 // 정산 유틸 테스트 (vitest)  실행: npm test
 // 시나리오 A·B는 /client/README-test.md 와 같은 데이터
-import { describe, expect, it, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
 import { calculateSettlements, splitEvenly } from './settle.js';
 
 const sum = (list, key) => list.reduce((acc, x) => acc + x[key], 0);
@@ -199,46 +201,49 @@ describe('calculateSettlements (USER-1)', () => {
   });
 });
 
-// [내 정보 → Mock 데이터 초기화]가 새 규칙으로 시드를 다시 만드는지 확인
-// (Profile 화면의 버튼은 resetDb()를 호출한다)
-describe('Mock 데이터 초기화 후 시드 반영', () => {
-  beforeEach(() => {
-    // node 환경용 localStorage 대용
-    const store = new Map();
-    globalThis.localStorage = {
-      getItem: (k) => (store.has(k) ? store.get(k) : null),
-      setItem: (k, v) => store.set(k, String(v)),
-      removeItem: (k) => store.delete(k),
-    };
+// server/db/seed.sql 에 손으로 적어 둔 분배(expense_splits)·정산(settlements) 값이
+// 현재 splitEvenly / calculateSettlements 규칙과 같은지 확인 (규칙을 바꾸면 seed.sql 도 고치라는 신호)
+describe('server/db/seed.sql 과 현재 규칙 일치', () => {
+  const seed = readFileSync(fileURLToPath(new URL('../../../server/db/seed.sql', import.meta.url)), 'utf8');
+
+  // "INSERT INTO <table> (...) VALUES (...), (...);" 의 각 행을 값 배열로 꺼낸다
+  const rowsOf = (table) => {
+    const block = seed.match(new RegExp(`INSERT INTO \`?${table}\`? \\(([^)]*)\\) VALUES([\\s\\S]*?);`));
+    const columns = block[1].split(',').map((c) => c.trim());
+    return [...block[2].matchAll(/\(([^()]*)\)/g)].map((m) => {
+      const values = m[1].split(',').map((v) => v.trim().replace(/^'(.*)'$/, '$1'));
+      const row = Object.fromEntries(columns.map((c, i) => [c, values[i]]));
+      for (const key of Object.keys(row)) if (/^-?\d+$/.test(row[key])) row[key] = Number(row[key]);
+      return row;
+    });
+  };
+  const members = rowsOf('group_members');
+  const expenses = rowsOf('expenses');
+  const splits = rowsOf('expense_splits');
+  const settlements = rowsOf('settlements');
+
+  it('시드 지출의 분배 금액이 splitEvenly 결과와 같다', () => {
+    for (const e of expenses) {
+      const saved = splits.filter((s) => s.expense_id === e.id);
+      const expected = splitEvenly(e.amount, saved.map((s) => s.member_id));
+      expect(saved.map((s) => s.share_amount), e.title).toEqual(expected.map((s) => s.share_amount));
+    }
   });
 
-  it('시드 지출의 분배 금액과 정산 결과가 새 규칙을 따른다', async () => {
-    const { resetDb } = await import('../mock/db.js');
-    const db = resetDb();
-
-    // 시나리오 B 점심(50,000원 / 3명) 분배가 반올림 규칙으로 저장됐는지
-    const lunch = db.expenses.find((e) => e.title === '점심 식사');
-    const lunchShares = db.expense_splits.filter((s) => s.expense_id === lunch.id).map((s) => s.share_amount);
-    expect(lunchShares).toEqual([16666, 16667, 16667]);
-
-    // 시드 데이터로 정산 계산 (2단계부터 api/ 는 서버를 호출하므로 계산 함수를 직접 사용)
-    // 이 기대값은 server/db/seed.sql 의 settlements 행과도 같다
-    const settle = (groupId) => {
-      const members = db.group_members.filter((m) => m.group_id === groupId);
-      const name = (id) => members.find((m) => m.id === id).display_name;
-      const expenses = db.expenses
+  it('시드 정산 행이 calculateSettlements 결과와 같다 (시나리오 A·B)', () => {
+    for (const groupId of [...new Set(expenses.map((e) => e.group_id))]) {
+      const groupMembers = members.filter((m) => m.group_id === groupId);
+      const groupExpenses = expenses
         .filter((e) => e.group_id === groupId)
-        .map((e) => ({ ...e, splits: db.expense_splits.filter((s) => s.expense_id === e.id) }));
-      return calculateSettlements(members, expenses).map((s) => [name(s.from), name(s.to), s.amount]);
-    };
-    expect(settle(1)).toEqual([
-      ['이영희', '홍길동', 37500],
-      ['박민수', '홍길동', 37500],
-      ['김철수', '홍길동', 7500],
-    ]);
-    expect(settle(2)).toEqual([
-      ['최지우', '김철수', 21667],
-      ['홍길동', '김철수', 11667],
-    ]);
+        .map((e) => ({ ...e, splits: splits.filter((s) => s.expense_id === e.id) }));
+      const expected = calculateSettlements(groupMembers, groupExpenses);
+      const saved = settlements
+        .filter((s) => s.group_id === groupId)
+        .map((s) => ({ from: s.from_member_id, to: s.to_member_id, amount: s.amount }));
+      expect(saved, `group ${groupId}`).toEqual(expected);
+    }
+    // 시나리오 B 점심(50,000원 / 3명) 분배가 반올림 규칙인지도 직접 확인
+    const lunch = expenses.find((e) => e.title === '점심 식사');
+    expect(splits.filter((s) => s.expense_id === lunch.id).map((s) => s.share_amount)).toEqual([16666, 16667, 16667]);
   });
 });

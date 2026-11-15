@@ -2,7 +2,8 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import styled from 'styled-components';
-import { IoAdd } from 'react-icons/io5';
+import { IoAdd, IoClose, IoWarningOutline } from 'react-icons/io5';
+import { Link } from 'react-router-dom';
 import { deleteExpense, getExpenses } from '../api/expenses.js';
 import { invalidateGroup } from '../hooks/invalidate.js';
 import { CATEGORY_COLORS } from '../utils/constants.js';
@@ -29,6 +30,40 @@ const CategoryDot = styled.span`
   background: ${(p) => CATEGORY_COLORS[p.$category] ?? '#868e96'};
 `;
 
+// 지출 변경으로 입금 완료 정산이 다시 계산됐을 때의 안내
+const Warning = styled.div`
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: #fff9db;
+  border: 1px solid #ffe066;
+  color: #7c5e00;
+  font-size: 14px;
+  line-height: 1.5;
+  svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  p {
+    flex: 1;
+    margin: 0;
+  }
+  a {
+    font-weight: 700;
+    text-decoration: underline;
+  }
+  button {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    line-height: 0;
+    padding: 2px;
+  }
+`;
+
 const Info = styled.div`
   flex: 1;
   min-width: 0;
@@ -44,10 +79,14 @@ export default function ExpenseTab({ group, isOwner }) {
     queryFn: () => getExpenses(group.id),
   });
   const [editing, setEditing] = useState(null); // null: 닫힘, 'new': 등록, expense 객체: 수정
+  const [warning, setWarning] = useState(null); // 서버가 보낸 정산 재계산 안내
 
   const deleteMut = useMutation({
     mutationFn: deleteExpense,
-    onSuccess: () => invalidateGroup(queryClient, group.id),
+    onSuccess: (result) => {
+      invalidateGroup(queryClient, group.id);
+      setWarning(result?.warning ?? null);
+    },
   });
 
   const total = (expenses ?? []).reduce((sum, e) => sum + e.amount, 0);
@@ -65,6 +104,17 @@ export default function ExpenseTab({ group, isOwner }) {
         )}
       </Row>
 
+      {warning && (
+        <Warning role="alert">
+          <IoWarningOutline size={18} />
+          <p>
+            {warning} <Link to="?tab=settlement">정산 탭에서 확인</Link>
+          </p>
+          <button type="button" aria-label="안내 닫기" onClick={() => setWarning(null)}>
+            <IoClose size={16} />
+          </button>
+        </Warning>
+      )}
       {isLoading && <Empty>불러오는 중...</Empty>}
       {error && <ErrorText>{error.message}</ErrorText>}
       {deleteMut.error && <ErrorText>{deleteMut.error.message}</ErrorText>}
@@ -104,7 +154,14 @@ export default function ExpenseTab({ group, isOwner }) {
         </Item>
       ))}
 
-      {editing && <ExpenseFormModal group={group} expense={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />}
+      {editing && (
+        <ExpenseFormModal
+          group={group}
+          expense={editing === 'new' ? null : editing}
+          onClose={() => setEditing(null)}
+          onSaved={setWarning}
+        />
+      )}
     </Stack>
   );
 }
