@@ -52,9 +52,6 @@ export default function Login() {
         <Muted style={{ textAlign: 'center' }}>
           계정이 없나요? <Link to="/signup" state={{ from }} style={{ color: 'var(--primary)', fontWeight: 600 }}>회원가입</Link>
         </Muted>
-        <Muted $size={12} style={{ textAlign: 'center' }}>
-          테스트 계정: demo@example.com / test1234 (server/db/seed.sql)
-        </Muted>
       </Stack>
     </AuthForm>
   );

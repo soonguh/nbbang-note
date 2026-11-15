@@ -31,14 +31,12 @@ cp .env.example .env      # Windows PowerShell: Copy-Item .env.example .env
 
 선택 항목 (없으면 기본값 사용): `JWT_EXPIRES_IN`(기본 7d), `CORS_ORIGIN`(기본 http://localhost:5173)
 
-### 2. 의존성 설치 + 시드 데이터
+### 2. 의존성 설치
 ```bash
 cd server
 npm install
-npm run db:seed           # ⚠ 6개 테이블의 기존 데이터를 지우고 시드로 다시 채움
 ```
-mysql CLI 가 없어도 동작합니다 (`server/db/runSeed.js` 가 `.env` 접속 정보로 `seed.sql` 실행).
-MySQL Workbench 에서 `server/db/seed.sql` 을 직접 실행해도 됩니다.
+계정은 앱 화면의 **회원가입**으로 만들면 됩니다.
 
 ### 3. 서버 실행
 ```bash
@@ -55,15 +53,17 @@ npm run dev               # http://localhost:5173
 ```
 Vite proxy 가 `/api` 요청을 `http://localhost:5000` 으로 전달합니다 (`client/vite.config.js`).
 
-### 테스트용 계정 (seed.sql)
-> ⚠ **테스트용**입니다. DB에는 bcrypt 해시만 저장되어 있습니다.
+### (선택) 테스트 시드 데이터 — ⚠ 실행하면 모든 데이터가 지워집니다
+```bash
+cd server
+npm run db:seed
+```
+> ⚠ **6개 테이블(회원·모임·지출·정산 전부)을 비운 뒤** 테스트용 데이터로 다시 채웁니다.
+> **직접 가입한 계정과 만든 모임도 모두 삭제**되니, 실제로 쓰는 DB에서는 실행하지 마세요.
 
-| 이메일 | 비밀번호 | 이름 | 비고 |
-|---|---|---|---|
-| demo@example.com | test1234 | 홍길동 | `강원도 MT` 총무, `금요일 점심` 참여자 |
-| kim@example.com | test1234 | 김철수 | `금요일 점심` 총무 |
-
-시나리오와 기대 정산 결과는 `client/README-test.md` 참고.
+- 시드 내용: 테스트 계정 홍길동(`demo@example.com`)·김철수(`kim@example.com`), 비밀번호는 둘 다 `test1234` (테스트용, DB에는 bcrypt 해시만 저장)과 예시 모임 2개
+- mysql CLI 가 없어도 동작합니다 (`server/db/runSeed.js` 가 `.env` 접속 정보로 `server/db/seed.sql` 실행). Workbench 에서 `seed.sql` 을 직접 실행해도 결과는 같습니다.
+- 시나리오와 기대 정산 결과는 `client/README-test.md` 참고
 
 ### client 단위 테스트
 ```bash
