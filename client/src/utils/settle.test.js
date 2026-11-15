@@ -214,7 +214,6 @@ describe('Mock 데이터 초기화 후 시드 반영', () => {
 
   it('시드 지출의 분배 금액과 정산 결과가 새 규칙을 따른다', async () => {
     const { resetDb } = await import('../mock/db.js');
-    const { getSettlement } = await import('../api/settlements.js');
     const db = resetDb();
 
     // 시나리오 B 점심(50,000원 / 3명) 분배가 반올림 규칙으로 저장됐는지
@@ -222,16 +221,22 @@ describe('Mock 데이터 초기화 후 시드 반영', () => {
     const lunchShares = db.expense_splits.filter((s) => s.expense_id === lunch.id).map((s) => s.share_amount);
     expect(lunchShares).toEqual([16666, 16667, 16667]);
 
-    // 홍길동(id 1)으로 로그인한 상태에서 정산 조회
-    localStorage.setItem('token', 'mock-token-1');
-    const a = await getSettlement(1);
-    expect(a.settlements.map((s) => [s.from_name, s.to_name, s.amount])).toEqual([
+    // 시드 데이터로 정산 계산 (2단계부터 api/ 는 서버를 호출하므로 계산 함수를 직접 사용)
+    // 이 기대값은 server/db/seed.sql 의 settlements 행과도 같다
+    const settle = (groupId) => {
+      const members = db.group_members.filter((m) => m.group_id === groupId);
+      const name = (id) => members.find((m) => m.id === id).display_name;
+      const expenses = db.expenses
+        .filter((e) => e.group_id === groupId)
+        .map((e) => ({ ...e, splits: db.expense_splits.filter((s) => s.expense_id === e.id) }));
+      return calculateSettlements(members, expenses).map((s) => [name(s.from), name(s.to), s.amount]);
+    };
+    expect(settle(1)).toEqual([
       ['이영희', '홍길동', 37500],
       ['박민수', '홍길동', 37500],
       ['김철수', '홍길동', 7500],
     ]);
-    const b = await getSettlement(2);
-    expect(b.settlements.map((s) => [s.from_name, s.to_name, s.amount])).toEqual([
+    expect(settle(2)).toEqual([
       ['최지우', '김철수', 21667],
       ['홍길동', '김철수', 11667],
     ]);

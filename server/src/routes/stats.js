@@ -1,0 +1,56 @@
+// 통계
+//   GET /api/groups/:id/stats → { group_id, total_amount, by_category: [{ category, total, count }], by_payer }
+import { Router } from 'express';
+import { pool } from '../db.js';
+import { requireAuth } from '../middleware/auth.js';
+import { asyncHandler } from '../middleware/errorHandler.js';
+import { loadGroupForUser } from '../middleware/permission.js';
+import { CATEGORIES } from './expenses.js';
+
+const router = Router();
+router.use('/groups/:id/stats', requireAuth);
+
+// ====== TODO(USER-5): 모임의 카테고리별 지출 합계를 구하는 SQL 작성 ======
+// 입력: ? 자리에 group_id 하나가 바인딩된다 (pool.execute(CATEGORY_TOTALS_SQL, [groupId]))
+// 출력: [{ category, total }] 행 목록  예) [{ category: '식비', total: 150000 }, { category: '교통', total: 10000 }]
+//       (선택) 건수도 함께 주면 화면에 "n건"이 표시된다: COUNT(*) AS count
+// 힌트: - 테이블: expenses (group_id, category, amount)
+//       - WHERE 로 해당 모임만 고르고, GROUP BY category 로 묶어 SUM(amount)
+//       - 값은 반드시 ? 파라미터로 받는다 (문자열 이어 붙이기 금지 → SQL 인젝션 위험)
+//       - 지출이 없는 카테고리는 결과에 없어도 된다 (아래 코드가 0원으로 채움)
+//       - 정렬은 선택 (예: ORDER BY total DESC)
+// ====== END TODO(USER-5) ======
+const CATEGORY_TOTALS_SQL = 'SELECT category, 0 AS total FROM expenses WHERE group_id = ? AND 1 = 0';
+
+router.get(
+  '/groups/:id/stats',
+  asyncHandler(async (req, res) => {
+    const group = await loadGroupForUser(pool, req.params.id, req.user);
+    const [rows] = await pool.execute(CATEGORY_TOTALS_SQL, [group.id]);
+    const byCategory = new Map(rows.map((r) => [r.category, r]));
+
+    const [[{ total }]] = await pool.execute('SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE group_id = ?', [group.id]);
+    const [byPayer] = await pool.execute(
+      `SELECT gm.id AS member_id, gm.display_name, COALESCE(SUM(e.amount), 0) AS total
+         FROM group_members gm LEFT JOIN expenses e ON e.payer_member_id = gm.id
+        WHERE gm.group_id = ?
+        GROUP BY gm.id, gm.display_name
+        ORDER BY gm.id`,
+      [group.id],
+    );
+
+    res.json({
+      group_id: group.id,
+      total_amount: Number(total),
+      // 4개 카테고리를 항상 같은 순서로, 결과에 없으면 0
+      by_category: CATEGORIES.map((category) => ({
+        category,
+        total: Number(byCategory.get(category)?.total ?? 0),
+        count: Number(byCategory.get(category)?.count ?? 0),
+      })),
+      by_payer: byPayer.map((p) => ({ ...p, total: Number(p.total) })),
+    });
+  }),
+);
+
+export default router;
