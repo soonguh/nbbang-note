@@ -10,21 +10,38 @@ import { calculateSettlements } from '../../../client/src/utils/settle.js';
  * @returns {Promise<object[]>} 저장된 settlements 행 목록
  */
 export async function saveSettlements(conn, groupId, results) {
-  // ====== TODO(USER-4): 재계산된 정산을 저장할 때 기존 입금 상태(is_paid, paid_at)를 어떻게 할지 결정 ======
+  // ====== TODO(USER-4): 재계산된 정산을 저장할 때 기존 입금 상태(is_paid, paid_at)를 어떻게 할지 결정 (구현 완료) ======
   // 입력: conn    = 트랜잭션 중인 DB 연결 (반드시 pool 이 아니라 conn 으로 쿼리해야 같은 트랜잭션에 포함됨)
   //       groupId = 모임 id
   //       results = [{ from_member_id, to_member_id, amount }]  새로 계산된 송금 목록 (amount 는 1 이상 정수)
   // 출력: 저장 후의 settlements 행 배열 [{ id, group_id, from_member_id, to_member_id, amount, is_paid, paid_at }]
-  // 힌트: - 지금 stub 은 "기존 행 전부 삭제 → is_paid = 0 으로 새로 INSERT" 라서, 지출이 바뀌면 입금 체크가 모두 풀린다
-  //       - 기존 행을 먼저 읽고(SELECT ... WHERE group_id = ? FOR UPDATE),
-  //         (from_member_id, to_member_id, amount) 가 같은 행은 남겨 두고 입금 상태를 유지하는 방법이 있다
-  //       - 금액만 바뀐 경우(같은 from/to, 다른 amount)는 유지? 초기화? 직접 결정
-  //         (이미 입금했는데 금액이 줄었다면 차액을 돌려줘야 하므로 초기화가 안전할 수 있음)
-  //       - 새 목록에 없는 기존 행은 DELETE, 기존에 없던 결과는 INSERT
-  //       - 모든 쿼리는 ? 파라미터 바인딩 사용
-  // ====== END TODO(USER-4) ======
-  await conn.execute('DELETE FROM settlements WHERE group_id = ?', [groupId]);
+  // 규칙: 1) 기존 행을 FOR UPDATE 로 잠그고 읽는다 (동시에 입금 토글이 들어와도 꼬이지 않게)
+  //       2) (from_member_id, to_member_id, amount) 가 완전히 같은 기존 행은 그대로 둔다 → 입금 상태·paid_at 유지
+  //       3) 금액만 바뀐 경우(같은 from/to, 다른 amount)는 유지하지 않고 새 행(미입금)으로 만든다
+  //          이유: 이미 보낸 금액과 새 금액이 다르면 차액을 주고받아야 하므로, 총무가 다시 확인하게 하는 것이 안전
+  //       4) 새 목록에 없는 기존 행은 DELETE, 기존에 없던 결과는 is_paid = 0 으로 INSERT
+  //       - 같은 (from, to, amount) 가 여러 건이어도 1:1 로만 짝지음 (한 기존 행을 두 번 재사용하지 않음)
+  const [existing] = await conn.execute(
+    'SELECT id, from_member_id, to_member_id, amount FROM settlements WHERE group_id = ? ORDER BY id FOR UPDATE',
+    [groupId],
+  );
+  const sameKey = (row, r) =>
+    Number(row.from_member_id) === Number(r.from_member_id) &&
+    Number(row.to_member_id) === Number(r.to_member_id) &&
+    Number(row.amount) === Number(r.amount);
+
+  const keptIds = new Set();
+  const toInsert = [];
   for (const r of results) {
+    const match = existing.find((row) => !keptIds.has(row.id) && sameKey(row, r));
+    if (match) keptIds.add(match.id);
+    else toInsert.push(r);
+  }
+
+  for (const row of existing) {
+    if (!keptIds.has(row.id)) await conn.execute('DELETE FROM settlements WHERE id = ?', [row.id]);
+  }
+  for (const r of toInsert) {
     await conn.execute(
       'INSERT INTO settlements (group_id, from_member_id, to_member_id, amount, is_paid, paid_at) VALUES (?, ?, ?, ?, 0, NULL)',
       [groupId, r.from_member_id, r.to_member_id, r.amount],
@@ -32,11 +49,12 @@ export async function saveSettlements(conn, groupId, results) {
   }
   const [rows] = await conn.execute('SELECT * FROM settlements WHERE group_id = ? ORDER BY id', [groupId]);
   return rows;
+  // ====== END TODO(USER-4) (구현 완료) ======
 }
 
 /**
  * 모임의 지출로 정산을 다시 계산해 저장한다. (지출 추가·수정·삭제 트랜잭션 안에서 호출)
- * 재계산 전에 이미 입금 완료된 건이 있으면 warning 문구를 돌려준다.
+ * 재계산 전에 이미 입금 완료된 건이 있으면 warning 문구를 돌려준다 (유지됐는지 / 초기화됐는지 구분).
  * @returns {Promise<{ settlements: object[], warning: string | null }>}
  */
 export async function recalculateSettlements(conn, groupId) {
@@ -56,16 +74,22 @@ export async function recalculateSettlements(conn, groupId) {
     splits: splits.filter((s) => s.expense_id === e.id).map(({ member_id, share_amount }) => ({ member_id, share_amount })),
   }));
 
-  const [[paid]] = await conn.execute('SELECT COUNT(*) AS cnt FROM settlements WHERE group_id = ? AND is_paid = 1', [groupId]);
+  const [paidBefore] = await conn.execute('SELECT id FROM settlements WHERE group_id = ? AND is_paid = 1', [groupId]);
   const results = calculateSettlements(members, withSplits)
     .filter((r) => Number.isInteger(r.amount) && r.amount > 0)
     .map((r) => ({ from_member_id: r.from, to_member_id: r.to, amount: r.amount }));
   const saved = await saveSettlements(conn, groupId, results);
 
-  const paidCount = Number(paid.cnt);
-  const warning =
-    paidCount > 0
-      ? `이미 입금 완료로 표시된 정산 ${paidCount}건이 있었어요. 지출이 바뀌어 정산을 다시 계산했으니 입금 상태를 확인해 주세요.`
-      : null;
+  // 입금 완료였던 행 중 살아남은 것(유지)과 사라진 것(금액이 바뀌어 미입금으로 다시 시작)을 구분해 안내
+  const stillPaid = new Set(saved.filter((s) => Number(s.is_paid) === 1).map((s) => s.id));
+  const kept = paidBefore.filter((p) => stillPaid.has(p.id)).length;
+  const reset = paidBefore.length - kept;
+  let warning = null;
+  if (paidBefore.length > 0) {
+    warning =
+      reset > 0
+        ? `입금 완료였던 정산 ${paidBefore.length}건 중 ${reset}건의 금액이 바뀌어 '미입금'으로 다시 계산됐어요. 이미 보낸 금액과 차액을 확인해 주세요.`
+        : `입금 완료된 정산 ${kept}건은 금액이 그대로라 입금 상태를 유지했어요. 바뀐 정산이 있는지 확인해 주세요.`;
+  }
   return { settlements: saved, warning };
 }

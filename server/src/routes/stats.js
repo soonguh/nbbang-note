@@ -10,17 +10,19 @@ import { CATEGORIES } from './expenses.js';
 const router = Router();
 router.use('/groups/:id/stats', requireAuth);
 
-// ====== TODO(USER-5): 모임의 카테고리별 지출 합계를 구하는 SQL 작성 ======
+// ====== TODO(USER-5): 모임의 카테고리별 지출 합계를 구하는 SQL 작성 (구현 완료) ======
 // 입력: ? 자리에 group_id 하나가 바인딩된다 (pool.execute(CATEGORY_TOTALS_SQL, [groupId]))
-// 출력: [{ category, total }] 행 목록  예) [{ category: '식비', total: 150000 }, { category: '교통', total: 10000 }]
-//       (선택) 건수도 함께 주면 화면에 "n건"이 표시된다: COUNT(*) AS count
-// 힌트: - 테이블: expenses (group_id, category, amount)
-//       - WHERE 로 해당 모임만 고르고, GROUP BY category 로 묶어 SUM(amount)
-//       - 값은 반드시 ? 파라미터로 받는다 (문자열 이어 붙이기 금지 → SQL 인젝션 위험)
-//       - 지출이 없는 카테고리는 결과에 없어도 된다 (아래 코드가 0원으로 채움)
-//       - 정렬은 선택 (예: ORDER BY total DESC)
-// ====== END TODO(USER-5) ======
-const CATEGORY_TOTALS_SQL = 'SELECT category, 0 AS total FROM expenses WHERE group_id = ? AND 1 = 0';
+// 출력: [{ category, total, count }] 행 목록  예) [{ category: '식비', total: 150000, count: 2 }]
+// - 해당 모임의 지출만 WHERE 로 고르고 category 별로 묶어 합계(SUM)와 건수(COUNT)를 구한다
+// - group_id 는 ? 파라미터로 바인딩 (SQL 인젝션 방지), 지출이 없는 카테고리는 아래 코드가 0원으로 채움
+// - 금액 큰 순으로 정렬 (같으면 카테고리 이름순)
+const CATEGORY_TOTALS_SQL = `
+  SELECT category, SUM(amount) AS total, COUNT(*) AS count
+    FROM expenses
+   WHERE group_id = ?
+   GROUP BY category
+   ORDER BY total DESC, category`;
+// ====== END TODO(USER-5) (구현 완료) ======
 
 router.get(
   '/groups/:id/stats',

@@ -8,18 +8,20 @@ import { HttpError } from './errorHandler.js';
  * @returns {boolean}
  */
 export function canEditGroup(user, group) {
-  // ====== TODO(USER-6): 모임 수정 권한 규칙 작성 ======
+  // ====== TODO(USER-6): 모임 수정 권한 규칙 작성 (구현 완료) ======
   // 입력: user  = { id }                        로그인한 사용자 (JWT에서 꺼낸 users.id)
   //       group = { id, name, owner_id, ... }   `groups` 테이블 행
   // 출력: true(수정 가능) / false(불가 → 403 응답)
-  // 힌트: - 기본 규칙은 "총무(owner_id)만 수정 가능"
-  //       - 규칙을 넓히고 싶다면 예) 회원으로 연결된 멤버(group_members.user_id = user.id)도 지출 등록 허용 등
-  //         단, 이 함수는 동기 함수라 DB를 조회할 수 없으니, 필요한 정보(예: group.is_member)를
-  //         loadGroupForUser 에서 미리 담아 넘기는 방식을 생각해 볼 것
-  //       - user 나 group 이 없으면 false
-  //       - owner_id 와 user.id 는 둘 다 숫자인지 확인 (문자열 '1' 과 숫자 1 비교 주의)
-  // ====== END TODO(USER-6) ======
-  return Boolean(user && group) && group.owner_id === user.id;
+  // 규칙: 총무(owner_id)만 수정 가능. 회원 멤버는 조회만 가능 (조회 권한은 loadGroupForUser 가 따로 확인)
+  //       이유: client 화면도 총무에게만 수정·삭제·입금 토글 버튼을 보여 주므로 서버 규칙을 같게 맞춘다
+  //             (서버가 더 넓게 허용하면 화면에 없는 기능을 API로 우회해 쓸 수 있게 됨)
+  // 방어: user·group 이 없거나 id 가 양의 정수가 아니면 false, 숫자로 바꿔 비교 ('1' 과 1 비교 문제 방지)
+  if (!user || !group) return false;
+  const userId = Number(user.id);
+  const ownerId = Number(group.owner_id);
+  if (!Number.isInteger(userId) || userId <= 0 || !Number.isInteger(ownerId)) return false;
+  return userId === ownerId;
+  // ====== END TODO(USER-6) (구현 완료) ======
 }
 
 /**
