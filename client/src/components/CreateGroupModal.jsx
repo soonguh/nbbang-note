@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { createGroup } from '../api/groups.js';
 import { useMe } from '../hooks/useMe.js';
+import { parseMemberNames } from '../utils/memberNames.js';
 import Modal from './Modal.jsx';
 import MemberNameInput from './MemberNameInput.jsx';
 import { MemberChip } from './MemberChips.jsx';
@@ -21,6 +22,11 @@ export default function CreateGroupModal({ onClose }) {
   const [name, setName] = useState('');
   const [meetingDate, setMeetingDate] = useState(today());
   const [memberNames, setMemberNames] = useState([]);
+  const [memberInput, setMemberInput] = useState(''); // [추가]를 누르기 전 입력칸에 남아 있는 글자
+
+  // 입력칸에 남아 있는 이름 (중복·빈 이름 제외) → [만들기] 때 함께 추가
+  const pendingNames = parseMemberNames(memberInput, [me?.name ?? '', ...memberNames]).names;
+  const totalCount = memberNames.length + pendingNames.length + 1; // +1: 총무
 
   const mutation = useMutation({
     mutationFn: createGroup,
@@ -33,7 +39,7 @@ export default function CreateGroupModal({ onClose }) {
 
   const submit = (e) => {
     e.preventDefault();
-    mutation.mutate({ name, meeting_date: meetingDate, member_names: memberNames });
+    mutation.mutate({ name, meeting_date: meetingDate, member_names: [...memberNames, ...pendingNames] });
   };
 
   return (
@@ -54,8 +60,13 @@ export default function CreateGroupModal({ onClose }) {
               // 총무 본인 이름도 중복 검사에 포함
               existingNames={[me?.name ?? '', ...memberNames]}
               onAdd={(names) => setMemberNames((prev) => [...prev, ...names])}
+              value={memberInput}
+              onValueChange={setMemberInput}
               placeholder="예) 김철수, 이영희, 박민수"
             />
+            {pendingNames.length > 0 && (
+              <Muted $size={13}>[추가]를 누르지 않아도 {pendingNames.join(', ')} 님은 모임을 만들 때 함께 추가돼요.</Muted>
+            )}
             <Muted $size={13}>
               쉼표로 여러 명을 한 번에 넣을 수 있어요. 회원이 아니어도 이름만으로 추가돼요. 총무({me?.name})는 자동으로 포함됩니다.
             </Muted>
@@ -72,7 +83,7 @@ export default function CreateGroupModal({ onClose }) {
               취소
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? '만드는 중...' : `만들기 (${memberNames.length + 1}명)`}
+              {mutation.isPending ? '만드는 중...' : `만들기 (${totalCount}명)`}
             </Button>
           </Row>
         </Stack>

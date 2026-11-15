@@ -1,0 +1,26 @@
+# 문서 (커밋 제외)
+*.md
+docs/
+
+# 환경 변수 (.env.example만 커밋)
+.env
+.env.*
+!.env.example
+
+# Node
+node_modules/
+npm-debug.log*
+
+# 빌드 결과물
+dist/
+coverage/
+
+# 도구 산출물
+.playwright-mcp/
+.claude/settings.local.json
+
+# OS / 에디터
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

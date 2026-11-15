@@ -9,9 +9,23 @@ import { Button, ErrorText, Input, Row, Stack } from './ui.js';
 /**
  * @param {string[]} existingNames 이미 있는 이름들 (중복 검사용)
  * @param {(names: string[]) => (void|Promise<void>)} onAdd 새 이름 목록을 받아 추가. 실패하면 throw
+ * @param {string} [value]                  (선택) 입력칸 값을 바깥에서 관리할 때
+ * @param {(value: string) => void} [onValueChange]  (선택) value 와 함께 사용
+ *   예) 모임 만들기에서 [추가]를 누르지 않고 [만들기]를 눌러도 입력칸의 이름을 함께 넣기 위해
  */
-export default function MemberNameInput({ existingNames, onAdd, disabled, placeholder = '이름 입력 (쉼표로 여러 명)', autoFocus }) {
-  const [value, setValue] = useState('');
+export default function MemberNameInput({
+  existingNames,
+  onAdd,
+  disabled,
+  placeholder = '이름 입력 (쉼표로 여러 명)',
+  autoFocus,
+  value: controlledValue,
+  onValueChange,
+}) {
+  const [innerValue, setInnerValue] = useState('');
+  const controlled = controlledValue !== undefined;
+  const value = controlled ? controlledValue : innerValue;
+  const setValue = (v) => (controlled ? onValueChange?.(v) : setInnerValue(v));
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
 
