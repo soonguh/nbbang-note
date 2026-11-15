@@ -133,7 +133,7 @@ export default function SettlementTab({ group, isOwner }) {
             <Empty>
               정산할 송금 내역이 없어요.
               <br />
-              <Muted $size={12}>(utils/settle.js의 calculateSettlements가 아직 stub이면 비어 있는 것이 정상이에요)</Muted>
+              <Muted $size={12}>지출이 없거나, 모두가 자기 몫만큼 냈어요.</Muted>
             </Empty>
           </Card>
         ) : (

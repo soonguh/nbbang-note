@@ -72,7 +72,7 @@ export default function SettlementCard({ group, settlement, isOwner, onToggle, t
       </Row>
       {open && (
         <Stack $gap={8} style={{ marginTop: 12 }}>
-          <TextArea readOnly rows={Math.min(8, message.split('\n').length + 1)} value={message} aria-label="송금 안내문" />
+          <TextArea readOnly rows={Math.min(14, message.split('\n').length + 1)} value={message} aria-label="송금 안내문" />
           <Row $justify="space-between">
             <Muted $size={12}>
               {settlement.to_account ? `받는 계좌: ${settlement.to_account.bank_name} ${settlement.to_account.account_number}` : '받는 사람의 계좌 정보가 없어요'}

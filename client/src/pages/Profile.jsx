@@ -96,7 +96,7 @@ export default function Profile() {
           <Row $justify="space-between" $wrap>
             <Stack $gap={2}>
               <strong>Mock 데이터 초기화</strong>
-              <Muted $size={13}>USER-2(splitEvenly)를 바꾼 뒤 누르면 시드 지출의 분배 금액이 새 규칙으로 다시 계산돼요.</Muted>
+              <Muted $size={13}>시드 데이터로 되돌리고, 시드 지출의 분배 금액을 현재 규칙(splitEvenly)으로 다시 계산해요.</Muted>
             </Stack>
             <Button $variant="danger" $small onClick={handleReset}>
               초기화

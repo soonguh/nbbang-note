@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import styled from 'styled-components';
 import { IoPeopleOutline, IoCalculatorOutline, IoCheckmarkDoneOutline, IoArrowForward } from 'react-icons/io5';
 import { useAuth } from '../hooks/useAuth.js';
+import { buildTransferMessage } from '../utils/message.js';
 import { Card } from '../components/ui.js';
 
 const Wrap = styled.main`
@@ -147,13 +148,12 @@ const FEATURES = [
   },
 ];
 
-// 예시 문구 (실제 앱의 안내문은 utils/message.js 의 buildTransferMessage 결과)
-const SAMPLE_MESSAGE = `[강원도 MT 정산 안내]
-이영희님 → 홍길동님
-37,500원
-
-카카오뱅크 3333-01-1234567 (홍길동)
-확인 후 입금 부탁드려요!`;
+// 예시 문구: 실제 앱과 같은 함수(buildTransferMessage)로 만든다
+const SAMPLE_MESSAGE = buildTransferMessage(
+  { name: '강원도 MT', meeting_date: '2026-11-07' },
+  { from_name: '이영희', to_name: '홍길동', amount: 37500, is_paid: false },
+  { bank_name: '카카오뱅크', account_number: '3333-01-1234567', holder_name: '홍길동' },
+);
 
 export default function Home() {
   const { me, loggedIn } = useAuth();
