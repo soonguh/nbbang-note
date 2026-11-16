@@ -3,8 +3,9 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import { addMember, deleteGroup, removeMember, renameMember, updateGroup } from '../api/groups.js';
+import { addMember, addMemberByEmail, deleteGroup, removeMember, renameMember, updateGroup } from '../api/groups.js';
 import { invalidateGroup } from '../hooks/invalidate.js';
+import { splitEmails } from '../utils/memberNames.js';
 import Modal from './Modal.jsx';
 import MemberNameInput from './MemberNameInput.jsx';
 import { MemberChip } from './MemberChips.jsx';
@@ -52,16 +53,54 @@ export default function ManageGroupModal({ group, onClose }) {
     },
     onError,
   });
-  // 여러 이름을 순서대로 한 명씩 추가 (API는 한 번에 한 명)
-  // 중간에 실패하면 거기서 멈추고 오류를 MemberNameInput 에 전달한다
-  const addMembers = async (names) => {
+  // 여러 명을 순서대로 한 명씩 추가 (API는 한 번에 한 명)
+  // - 이메일 → 가입한 회원을 회원 멤버로 / 이름 → 비회원 멤버로
+  // - 같은 이름의 비회원이 있으면 그 비회원을 회원과 연결할지 묻는다 (연결하면 지출·정산 기록을 이어받음)
+  // 실패한 항목은 모아서 MemberNameInput 에 오류로 전달한다
+  const addMembers = async (tokens) => {
+    const { emails, names } = splitEmails(tokens);
+    const failed = []; // 안내 문구
+    const failedTokens = []; // 입력칸에 다시 남길 항목
     try {
       for (const n of names) {
-        await addMember(group.id, n);
+        try {
+          await addMember(group.id, n);
+        } catch (e) {
+          failed.push(e.message);
+          failedTokens.push(n);
+        }
+      }
+      for (const email of emails) {
+        try {
+          await addMemberByEmail(group.id, email);
+        } catch (e) {
+          if (e.data?.code !== 'NAME_CONFLICT') {
+            failed.push(e.message);
+            failedTokens.push(email);
+            continue;
+          }
+          const ok = window.confirm(
+            `같은 이름의 비회원 '${e.data.member_name}'이(가) 이미 있어요.\n` +
+              `이 비회원을 회원(${email})과 연결할까요?\n\n` +
+              `연결하면 '${e.data.member_name}'의 지출·정산 기록이 이 회원의 것으로 이어지고,\n` +
+              `회원은 자기 "참여 중인 모임"에서 이 모임을 볼 수 있어요.`,
+          );
+          if (!ok) {
+            failed.push(`추가하지 않았어요: ${email} (같은 이름의 비회원이 있음)`);
+            continue;
+          }
+          try {
+            await addMemberByEmail(group.id, email, e.data.member_id);
+          } catch (e2) {
+            failed.push(e2.message);
+            failedTokens.push(email);
+          }
+        }
       }
     } finally {
       refresh();
     }
+    if (failed.length > 0) throw Object.assign(new Error(failed.join(' / ')), { remaining: failedTokens.join(', ') });
   };
   // 멤버 이름 수정: renaming = { id, value } (null 이면 수정 중 아님)
   const [renaming, setRenaming] = useState(null);
@@ -170,7 +209,7 @@ export default function ManageGroupModal({ group, onClose }) {
                 <MemberChip
                   key={m.id}
                   name={m.display_name}
-                  tag={isOwner ? '총무' : m.user_id ? null : '비회원'}
+                  tag={isOwner ? '총무' : m.user_id ? '회원' : '비회원'}
                   muted={!isOwner && !m.user_id}
                   disabled={removeMut.isPending || renameMut.isPending}
                   onEdit={() => setRenaming({ id: m.id, value: m.display_name })}
@@ -187,8 +226,11 @@ export default function ManageGroupModal({ group, onClose }) {
           <MemberNameInput
             existingNames={group.members.map((m) => m.display_name)}
             onAdd={addMembers}
-            placeholder="추가할 이름 (쉼표로 여러 명)"
+            placeholder="이름 또는 회원 이메일 (쉼표로 여러 명)"
           />
+          <Muted $size={12}>
+            이름은 비회원으로, 가입한 회원의 이메일은 회원으로 추가돼요. 회원은 자기 "참여 중인 모임"에서 이 모임을 보고, 정산 안내문에 계좌가 표시돼요.
+          </Muted>
         </Stack>
       </Section>
 

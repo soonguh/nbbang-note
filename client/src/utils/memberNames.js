@@ -36,6 +36,19 @@ export function parseMemberNames(input, existingNames = []) {
   return { names, duplicates };
 }
 
+// 입력 조각이 이메일이면 "가입한 회원"으로, 아니면 "이름만 있는 비회원"으로 다룬다
+export function isEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((value ?? '').trim());
+}
+
+// 이름 목록을 이메일(회원) / 이름(비회원)으로 나눈다. 이메일은 소문자로 맞춘다
+export function splitEmails(tokens) {
+  const emails = [];
+  const names = [];
+  tokens.forEach((t) => (isEmail(t) ? emails.push(t.trim().toLowerCase()) : names.push(t)));
+  return { emails, names };
+}
+
 // 중복 안내 문구: "이미 추가된 이름이에요: 김철수, 이영희"
 export function duplicateMessage(duplicates) {
   return duplicates.length > 0 ? `이미 추가된 이름이에요: ${duplicates.join(', ')}` : '';

@@ -9,6 +9,7 @@ import { Button, ErrorText, Input, Row, Stack } from './ui.js';
 /**
  * @param {string[]} existingNames 이미 있는 이름들 (중복 검사용)
  * @param {(names: string[]) => (void|Promise<void>)} onAdd 새 이름 목록을 받아 추가. 실패하면 throw
+ *   (throw 한 오류에 remaining 문자열을 담으면 그 값만 입력칸에 남긴다 → 성공한 항목은 입력칸에서 사라짐)
  * @param {string} [value]                  (선택) 입력칸 값을 바깥에서 관리할 때
  * @param {(value: string) => void} [onValueChange]  (선택) value 와 함께 사용
  *   예) 모임 만들기에서 [추가]를 누르지 않고 [만들기]를 눌러도 입력칸의 이름을 함께 넣기 위해
@@ -33,17 +34,20 @@ export default function MemberNameInput({
     const { names, duplicates } = parseMemberNames(value, existingNames);
     if (names.length === 0 && duplicates.length === 0) return; // 빈 입력
     let error = '';
+    let remaining = '';
     if (names.length > 0) {
       try {
         setBusy(true);
         await onAdd(names);
       } catch (e) {
         error = e.message;
+        // onAdd 가 실패한 항목만 e.remaining 으로 알려 주면 그것만 입력칸에 남긴다 (없으면 입력값 전체 유지)
+        remaining = typeof e.remaining === 'string' ? e.remaining : value;
       } finally {
         setBusy(false);
       }
     }
-    setValue(error ? value : '');
+    setValue(error ? remaining : '');
     setMessage([duplicateMessage(duplicates), error].filter(Boolean).join(' / '));
   };
 

@@ -1,10 +1,12 @@
 // 공통 에러 처리
 // 라우트에서 throw new HttpError(404, '...') 하면 { message } JSON 으로 응답한다.
+// 세 번째 인자(extra)를 주면 응답에 함께 담는다. 예) { code: 'NAME_CONFLICT', member_id: 3 }
 
 export class HttpError extends Error {
-  constructor(status, message) {
+  constructor(status, message, extra = undefined) {
     super(message);
     this.status = status;
+    this.extra = extra;
   }
 }
 
@@ -32,7 +34,7 @@ const DB_DOWN = ['ECONNREFUSED', 'ER_ACCESS_DENIED_ERROR', 'ER_BAD_DB_ERROR', 'P
 
 // eslint-disable-next-line no-unused-vars
 export function errorHandler(err, req, res, next) {
-  if (err instanceof HttpError) return res.status(err.status).json({ message: err.message });
+  if (err instanceof HttpError) return res.status(err.status).json({ ...err.extra, message: err.message });
   if (err.type === 'entity.parse.failed') return res.status(400).json({ message: '요청 본문(JSON) 형식이 올바르지 않습니다.' });
   if (MYSQL_ERRORS[err.code]) {
     const [status, message] = MYSQL_ERRORS[err.code];

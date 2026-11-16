@@ -7,10 +7,11 @@ import axios from 'axios';
 const TOKEN_KEY = 'token';
 
 export class ApiError extends Error {
-  constructor(message, status = 0) {
+  constructor(message, status = 0, data = {}) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.data = data; // 서버가 함께 보낸 정보 (예: { code: 'NAME_CONFLICT', member_id })
   }
 }
 
@@ -29,7 +30,7 @@ http.interceptors.response.use(
     const message =
       error.response?.data?.message ??
       (status === 0 ? '서버에 연결할 수 없습니다. server 가 실행 중인지 확인해 주세요.' : '요청을 처리하지 못했습니다.');
-    return Promise.reject(new ApiError(message, status));
+    return Promise.reject(new ApiError(message, status, error.response?.data ?? {}));
   },
 );
 

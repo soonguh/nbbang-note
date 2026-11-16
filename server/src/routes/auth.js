@@ -4,6 +4,7 @@
 //   GET   /api/me                                                → user
 //   PATCH /api/me/account    body: { bank_name, account_number } → user
 //   DELETE /api/me           body: { password }                  → { id }  (회원 탈퇴)
+//   GET   /api/users/lookup?email=  → { id, name, email }  (모임에 추가할 회원 찾기)
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
 import { pool, withTransaction } from '../db.js';
@@ -95,6 +96,20 @@ router.patch(
     ]);
     const user = await findPublicUser(req.user.id);
     if (!user) throw new HttpError(401, '로그인이 필요합니다.');
+    res.json(user);
+  }),
+);
+
+// 가입한 회원 찾기 (모임 멤버로 추가하기 전 확인용)
+// 로그인한 사용자만, 이메일이 정확히 일치할 때만, id·이름·이메일만 돌려준다 (계좌 등은 제외)
+router.get(
+  '/users/lookup',
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const email = text(req.query.email).toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, '이메일 형식이 올바르지 않습니다.');
+    const [[user]] = await pool.execute('SELECT id, name, email FROM users WHERE email = ?', [email]);
+    if (!user) throw new HttpError(404, `가입한 회원이 아니에요: ${email}`);
     res.json(user);
   }),
 );

@@ -82,7 +82,8 @@ npm test                  # vitest: 정산·분배·안내문
 | GET / POST | /groups | 목록 `{ owned, joined }` / 생성 | 로그인 |
 | GET | /groups/:id | 모임 상세 | 총무·회원 멤버 |
 | PATCH / DELETE | /groups/:id | 수정 / 삭제 | canEditGroup |
-| POST / PATCH / DELETE | /groups/:id/members[/:memberId] | 멤버 추가 / 이름 수정 / 제외 | canEditGroup |
+| POST / PATCH / DELETE | /groups/:id/members[/:memberId] | 멤버 추가(`{ display_name }` 비회원 / `{ email }` 회원 / `{ email, link_member_id }` 비회원을 회원과 연결) / 이름 수정 / 제외 | canEditGroup |
+| GET | /users/lookup?email= | 모임에 추가할 회원 찾기 → `{ id, name, email }` (계좌 등 제외) | 로그인 |
 | GET / POST | /groups/:id/expenses | 지출 목록 / 등록 (+정산 재계산) | 조회: 멤버, 등록: canEditGroup |
 | PATCH / DELETE | /expenses/:id | 지출 수정 / 삭제 (+정산 재계산) | canEditGroup |
 | GET | /groups/:id/settlement | 멤버별 요약 + 송금 목록(받는 사람 계좌 포함) | 총무·회원 멤버 |
